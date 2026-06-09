@@ -1,6 +1,6 @@
 # 🧠 PALM — Personalized Adaptive Learning Mentor
 
-**PALM** is a multimodal, multi-agent AI tutoring system designed for primary school students (Grades 1–5) in core mathematics. It combines real-time computer-vision-based affective state recognition (emotion + gaze tracking), a multi-agent cognitive engine, and curriculum-grounded instruction to deliver truly adaptive, one-on-one learning experiences.
+**PALM** is a multimodal, multi-agent AI tutoring system designed for primary school students (Grade 5) in core mathematics. It combines real-time computer-vision-based affective state recognition (emotion + gaze tracking), a multi-agent cognitive engine, and curriculum-grounded instruction to deliver truly adaptive, one-on-one learning experiences.
 
 ---
 
@@ -198,12 +198,12 @@ PALM uses a **blackboard-architecture** where a shared state object flows throug
 
 ## 👥 Team
 
-| Name | Role |
-|------|------|
-| **Tanmay Mene** | Full-Stack Development, Multi-Agent Architecture |
-| **Vaibhav Khedekar** | Backend, Orchestration & State Management |
-| **Mithilesh Pawar** | Evaluation, Testing & Analysis |
-| **Atharva Deshpande** | Frontend, Perception & UX |
+| Name |
+|------|
+| **Tanmay Mene** |
+| **Vaibhav Walujkar** |
+| **Mithilesh Singh** |
+| **Atharva Humane** |
 
 ---
 
