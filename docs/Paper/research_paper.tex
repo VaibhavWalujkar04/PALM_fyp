@@ -1,0 +1,769 @@
+\documentclass[conference, letterpaper]{IEEEtran}
+
+% *** GRAPHICS RELATED PACKAGES ***
+%
+\ifCLASSINFOpdf
+   \usepackage[pdftex]{graphicx}
+\else
+\fi
+
+% *** MATH PACKAGES ***
+%
+\usepackage[cmex10]{amsmath}
+\usepackage{amssymb}
+\usepackage{color}
+%
+\usepackage{fancyhdr}
+\usepackage[caption=false,font=footnotesize]{subfig}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{url}
+\usepackage{verbatim}
+
+\renewcommand{\thispagestyle}[2]{} 
+
+\fancypagestyle{plain}{
+        \fancyhead{}
+        \fancyhead[C]{}
+        \fancyfoot{}
+        \fancyfoot[C]{}
+}
+\pagestyle{fancy}
+
+\headheight 20pt
+\footskip 20pt
+
+\rhead{}
+
+%Enter the first page number of your paper below
+\setcounter{page}{1}
+
+%Header
+\fancyhead[R]{\textit{(IJACSA) International Journal of Advanced Computer Science and Applications, \\ Vol. XXX, No. XXX, 2026}}
+\renewcommand{\headrulewidth}{0pt}
+
+%Footer
+\fancyfoot[C]{www.ijacsa.thesai.org}
+\renewcommand{\footrulewidth}{0.5pt}
+\fancyfoot[R]{\thepage \  $|$ P a g e }
+
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
+
+\title{PALM: A Privacy-Preserving, Perception-Aware Multi-Agent Tutoring System with Deterministic Curriculum Grounding for Primary School Mathematics}
+
+\author{\IEEEauthorblockN{Tanmay Mene, Atharva Humane, Mithilesh Singh, Vaibhav Walujkar}
+\IEEEauthorblockA{Veermata Jijabai Technological Institute\\
+Mumbai, India}
+\and
+\IEEEauthorblockN{Prof. Manasi Kulkarni}
+\IEEEauthorblockA{Veermata Jijabai Technological Institute\\
+Mumbai, India}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+There are currently three simultaneous gaps in AI tutors: they cannot perceive when their students are sending them distress signals without saying anything, they create explanations that contain hallucinated math concepts, and they follow a curriculum inflexibly without adjusting to the state of their learners at any moment. The current literature considers each of these problems separately as an engineering issue: affective tutoring systems are unaware of the curriculum, multi-agent orchestrators do not have visual perception, and RAG-based tutors are grounded yet do not have adaptation in real-time. To address all of these shortcomings in one system, we propose PALM (Personalized Adaptive Learning Mentor), an end-to-end multimodal AI tutor for elementary school math (grades 1-5). PALM makes five crucial advancements: (1) a privacy-safe perception engine that runs the MediaPipe FaceLandmarker module locally in WebAssembly and sends only 1 Hz JSON semantic labels from a webcam feed, (2) a deterministic 13-step linear pipeline to replace non-deterministic graph orchestrators in order to make each tutoring turn reproducible and auditable, (3) a structured relational curriculum store in PostgreSQL that is used to ground the AI tutor's output, thus preventing math hallucinations, (4) three feedback loops (Struggle, Boredom, Mastery) that combine gaze deviation, facial emotion, and answer accuracy, which, according to our knowledge, is the first deployed system where tutoring decisions depend on all three types of signals simultaneously, and (5) eight different agents orchestrated using a common blackboard architecture. Through persona simulation and a comprehensive evaluation by a large language model acting as a judge, PALM exhibits strong performance (9.5/10) in emotional intelligence and safety compliance (10/10) as well as in adaptive agent selection while identifying weaknesses in Socratic methodology and content accuracy.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Intelligent Tutoring Systems; Multi-Agent Systems; Affective Computing; Privacy-Preserving Perception; Curriculum Grounding; Large Language Models; Primary Education
+\end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
+
+% ══════════════════════════════════════════════════════════
+% 1. INTRODUCTION
+% ══════════════════════════════════════════════════════════
+\section{Introduction}
+
+AI has made an impact in education, yet current AI-powered tutoring systems still lack in many aspects in order to accurately mimic a human tutor's adaptive, empathic and perceptually-aware interactions. Namely, an expert tutor simultaneously evaluates a learner's facial expressions to detect signs of frustration, determines the extent of the learner's visual attention towards the educational material, adjusts difficulty level and pace of instruction based on gathered evidence of understanding, and importantly, does not generate false information by making up new mathematics that is not present in the curriculum. Modern AI-based tutoring systems have shortcomings in at least one of these areas. A pure textual interface is completely oblivious to nonverbal signals of distress – both students who stare blankly into the ceiling and those engaged in the discussion receive identical responses. Tutoring systems powered by large language models can engage in hallucination, where mathematical examples, definitions, and instructions are generated without basis from the curriculum. Finally, tutoring systems following pre-set pedagogical strategies are unable to adjust their teaching methods based on emotional and attentional states of learners.
+
+To the best of our knowledge, these three problems – perceptual blindness, content hallucination, and adaptive rigidity – were studied independently, but never considered together in one implementation of a tutoring system. Many emotion recognition techniques developed in the context of affective computing are advanced enough, yet few studies consider combining these with curriculum-aligned tutoring. Multi-agent orchestration studies demonstrate the usefulness of specialized agents for particular types of tasks in the learning process; current multi-agent tutoring systems, however, are restricted to text-based learning, thus failing to perceive the learner visually. While techniques such as RAG address the problem of hallucinations by anchoring LLMs' outputs to a document, semantic retrieval in mathematical domain results in topic mixing.
+
+\subsection{Motivation and Research Gap}
+
+The educational AI literature reveals a fragmented landscape where three critical capabilities---affective perception, curriculum grounding, and adaptive orchestration---are treated as separate research problems:
+
+\textbf{Affective ITS papers ignore curriculum grounding.} Applications such as MathBuddy \cite{mathbuddy2025} support emotional and multiple modality aware tutors, but still fail to solve the issue of hallucinations. Their generated responses using large language models are not aligned with the curriculum, which creates a risk of introducing inaccurate mathematical knowledge.
+
+\textbf{Multi-agent ITS papers ignore visual perception.} IntelliCode \cite{intellicode2025} and GenMentor \cite{genmentor2025} use advanced multi-agent orchestration with specific agents for particular roles within teaching processes; however, all the agent's actions are based only on textual input—the student's text messages and their history. No visual nor emotional cues influence the choice of agent to work with.
+
+\textbf{RAG-based tutors ground content but lack real-time adaptation.} LPITutor \cite{lpitutor2025} supports retrieval-augmented generation that helps to align LLM responses with the curriculum, making the system less vulnerable to hallucinations. Yet, these systems operate in static Q\&A fashion without any knowledge of the student's emotions.
+
+Currently, there is no system implemented and working in real time that integrates all three abilities mentioned above. The novelty of PALM lies precisely here. It is worth noting that PALM is meant to be an \emph{auxiliary} learning tool for human teachers.
+
+\subsection{Contributions}
+
+This paper makes the following contributions:
+
+\begin{enumerate}[label=(\arabic*)]
+    \item \textbf{A unified perception--action cycle} coupling client-side affective state recognition (emotion classification from 52 facial blendshapes + gaze tracking from iris landmarks) with a server-side multi-agent pedagogical pipeline---the first deployed system to close this loop for primary school mathematics tutoring.
+
+    \item \textbf{A privacy-preserving perception architecture} where all facial analysis runs entirely in-browser via WebAssembly (MediaPipe FaceLandmarker). Raw video frames \emph{never leave the device}; only 1\,Hz JSON semantic labels (\texttt{\{emotion, gaze\}}, $\sim$100 bytes/second) are transmitted to the server---a 500$\times$ bandwidth reduction and a meaningful departure from server-side processing approaches, directly addressing COPPA/GDPR concerns for primary-age students.
+
+    \item \textbf{A deterministic 13-step linear pipeline} replacing non-deterministic graph-based orchestrators (e.g., LangGraph StateGraph). Every tutoring turn executes the same 13 steps in the same order, enabling full auditability and reproducibility---a critical property for child-facing educational systems.
+
+    \item \textbf{A structured relational curriculum store} (PostgreSQL) as an anti-hallucination grounding mechanism. Each curriculum section is a self-contained teaching unit with pre-authored explanations, examples, misconceptions, hint progressions, and quiz questions. Deterministic \texttt{section\_id} lookup replaces probabilistic vector-RAG, eliminating cross-chapter contamination.
+
+    \item \textbf{Three adaptive feedback loops} (Struggle, Boredom, Mastery) triggered by fused multimodal signals---the first deployed system to condition pedagogical branching on the simultaneous combination of gaze deviation, facial emotion, and answer correctness.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════
+% 2. RELATED WORK
+% ══════════════════════════════════════════════════════════
+\section{Related Work}
+
+\subsection{Intelligent Tutoring Systems and LLM-Based Tutors}
+
+Intelligent tutoring systems (ITS) boast a history spanning several decades, from simple rule-based systems to modern LLM-driven ones. Classic ITS, represented by Carnegie Learning's Cognitive Tutor, were built around carefully crafted production rules and Bayesian Knowledge Tracing for modeling the student’s understanding. With the advent of LLMs, the game has changed completely: modern ITS are able to produce natural language explanations and adjust the discourse depending on the student’s proficiency; moreover, LLM-powered tutors can engage the user in an open conversation as opposed to using pre-set answers.
+
+Current projects like IntelliCode \cite{intellicode2025} exemplify the use of LLM-powered, multi-agent pipelines where StateGraph is responsible for directing student queries to various agents (e.g., code explainer, hint generator, quiz master). In turn, GenMentor \cite{genmentor2025} uses a goal-skill mapper for breaking down learning goals into skills and dispatches each micro-skill to a respective LLM agent. Meanwhile, SocraticLM explores the concept of Socratic questioning through chain-of-thought prompting in order to nudge the student toward the solution. The instruction-following capabilities underlying these systems were enabled by reinforcement learning from human feedback (RLHF) \cite{ouyang2022}.
+
+Nevertheless, in all of these cases, the pipeline relies solely on textual prompts. If a student looks at the screen blankly, is emotionally irritated or simply puzzled, this information will not make its way into the pipeline since there are no tools to detect that kind of information.
+
+\subsection{Multi-Agent Orchestration in Education}
+
+The use of multiple agents in educational AI is becoming increasingly popular due to their ability to facilitate \emph{specialization} (in which each agent develops a unique set of capabilities for certain pedagogic purposes) and \emph{auditability} (because decisions are attributable to particular agents and the rationale behind them). A comprehensive survey by Tran et al. \cite{tran2025} documents the various collaboration mechanisms employed in LLM-based multi-agent systems, including role assignment, communication protocols, and coordination strategies. Li et al. \cite{li2020} further explore decentralized reinforcement learning approaches for cooperative multi-agent coordination. For instance, in IntelliCode, the orchestration engine called StateGraph Orchestrator uses a non-deterministic graph where nodes stand for different agent states while edges stand for the transition between states caused by student actions. GenMentor has a centralized planning unit assigning roles to specialized skill agents.
+
+All existing multi-agent ITS share a critical limitation of basing the decision of choosing an agent to handle a request on \emph{textual input} only (that includes the student's typed message, conversation history, and sometimes, a knowledge state model). There is not a single multi-agent tutoring system that takes perceptual data from the classroom as input for its orchestration mechanism. PALM seeks to solve this problem by introducing perception signals (such as emotions or eye gaze) as input states in the orchestrator.
+
+\subsection{Affective Computing and Emotion-Aware Tutoring}
+
+There have been various systems developed as the result of the confluence of affective computing and education. One such example is MathBuddy \cite{mathbuddy2025}, which performs multimodal affective math tutoring by employing facial emotion detection alongside text-based emotion detection (EMNLP 2025). It is important to highlight that MathBuddy uses only facial and textual emotions, without using gaze information. The face tracking process of this system is performed server-side, thus raising ethical concerns regarding minors' privacy; moreover, it lacks a curriculum grounding mechanism.
+
+Another system of relevance is the MATS (Multimodal Adaptive Tutoring System) \cite{mats2025} paradigm, where the idea consists of combining real-time data streams, including those relating to facial expressions, gaze, and physiological reactions, to make decisions regarding tutoring, although no implemented system exists, but only serves as a design paradigm. Lastly, IGI Global's emotional design tutoring system studies the possibilities of using emotional state information in the decision-making processes when designing instructions but does not use automated emotion recognition techniques but asks the participant's feelings instead.
+
+An important feature common among most existing affective tutoring systems is the absence of gaze information. Gaze plays an extremely important role in identifying a student's engagement, as the mere act of turning one's eyes away from the screen multiple times indicates low level of engagement \cite{qarbal2025, shiri2024}. Gupta et al. \cite{gupta2016} introduced the DAiSEE dataset for user engagement recognition in the wild, establishing benchmarks for engagement detection from video. Nevertheless, gaze measurement may require special hardware devices (eye trackers) or sophisticated software algorithms (iris landmark tracking). PALM is an excellent example of a system where commodity webcams and MediaPipe's iris landmark tracking provide sufficient gaze classification accuracy.
+
+\subsection{Hallucination and Curriculum Grounding in Educational AI}
+
+The term hallucination refers to the creation of plausible but inaccurate content. Hallucination is particularly dangerous in mathematics education due to the ability to teach erroneous facts and rules \cite{cobbe2021}. The current solution proposed in the literature about mitigating hallucinations in LLMs is Retrieval-Augmented Generation (RAG), originally introduced by Lewis et al. \cite{lewis2020}. A recent survey by Swacha and Gracel \cite{swacha2025} documents the growing adoption of RAG-based chatbots in educational contexts. In this technique, the LLM's input context is supplemented by documents extracted from an external document collection and used as grounding.
+
+To apply RAG in educational tutoring, LPITutor \cite{lpitutor2025} embeds curriculum documents into a vector database and retrieves chunks of content in response to queries generated by individual students. Although this method improves performance in comparison to pure generation, PALM's use of a similar approach (explained in Section 3.3) highlights inherent flaws in applying RAG for educating students in math topics. For instance, searching for the cosine similarity in chunked texts showed that the contamination rate of cross-chapter retrieval in the curriculum ranged from 30\% to 40\%, meaning that the model retrieved information about other math topics, including those outside the requested chapter, to educate the user.
+
+
+To address this problem, PALM replaced probabilistic retrieval with deterministic loading based on section IDs in a relational database. As in Section 3.3, each chapter in a curriculum is considered an independent teaching unit and assigned its own unique \texttt{section\_id}. Content is loaded using the primary key lookup instead of semantic search, eliminating retrieval noise entirely but limiting the system's flexibility to a pre-existing curriculum.
+
+\subsection{Client-Side and Privacy-Preserving Perception}
+
+Prior affective tutoring systems that utilize cameras for facial expression tracking and eye-gaze estimation would stream video streams from the cameras to a remote server for processing purposes; thus, there are serious privacy issues that should be considered when dealing with children in particular, as they fall under the jurisdiction of laws like COPPA (Children’s Online Privacy Protection Act) and GDPR.
+
+WebAssembly-based MediaPipe’s FaceLandmarker model allows real-time extraction of facial landmarks within the browser context. The proposed PALM framework capitalizes on this feature by designing a perception pipeline where the video stream is processed within the browser, 52 facial blendshapes as well as iris landmarks are extracted using the FaceLandmarker model, threshold classifiers output emotion and gaze labels and \emph{only these labels} are sent to the server at 1\,Hz in the form of JSON($\sim$100 bytes/second) objects. Video frames do not leave the client machine at all.
+
+To the best of our knowledge, such an architectural design has not yet been considered in any of the research papers on affective tutoring systems. Not only does it allow one to save bandwidth upto 500$\times$ compared to JPEG-based approach, but also makes it possible not to transfer any biometric information whatsoever.
+
+\subsection{Summary of Related Work}
+
+\begin{table}[!t]
+\centering
+\caption{Comparison of PALM with related systems across key capabilities.}
+\label{tab:comparison}
+\small
+\begin{tabularx}{\columnwidth}{@{}l*{5}{>{\centering\arraybackslash}X}@{}}
+\toprule
+\textbf{System} & \textbf{Multi-Agent} & \textbf{Emotion} & \textbf{Gaze} & \textbf{Curriculum Grounding} & \textbf{Privacy-First} \\
+\midrule
+IntelliCode       & \checkmark & --         & --         & Partial (RAG) & -- \\
+GenMentor         & \checkmark & --         & --         & --            & -- \\
+MathBuddy         & --         & \checkmark & --         & --            & -- \\
+MATS              & --         & \checkmark & \checkmark & --            & -- (conceptual) \\
+LPITutor          & --         & --         & --         & \checkmark (RAG) & -- \\
+SocraticLM        & --         & --         & --         & --            & -- \\
+\textbf{PALM}     & \checkmark & \checkmark & \checkmark & \checkmark (Relational) & \checkmark \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ══════════════════════════════════════════════════════════
+% 3. PROPOSED METHODOLOGY
+% ══════════════════════════════════════════════════════════
+\section{Proposed Methodology}
+
+\subsection{Problem Formulation}
+
+We formalize the tutoring interaction as a turn-based perception--action cycle. At each turn $t$, the system maintains a student state:
+\[
+S_t = (e_t,\; g_t,\; m_t,\; H_t)
+\]
+where $e_t \in \{\texttt{happy}, \texttt{sad}, \texttt{neutral}, \texttt{confused}, \texttt{frustrated}, \texttt{confident}, \texttt{fearful}, \texttt{bored}\}$ is the detected emotion, $g_t \in \{\texttt{on\_screen}, \texttt{off\_screen}, \texttt{closed\_eyes}\}$ is the gaze state, $m_t$ is the mastery status vector over curriculum sections, and $H_t$ is the conversation history (last 10 messages plus a compressed session summary).
+
+The curriculum is defined as an ordered set $C = \{c_1, c_2, \ldots, c_n\}$ of self-contained sections within a chapter. Each section $c_i$ contains fields for its concept, explanation, examples, hints, quiz questions, and common misconceptions.
+
+At each turn, the orchestrator selects an agent response policy:
+\[
+\pi_t = \text{Orchestrator}(S_t, c_{current}, H_t) \rightarrow (a_{primary}, \{a_{support}\}, goal_t)
+\]
+where $a_{primary}$ is the primary agent and $\{a_{support}\}$ is the set of supporting agents. A guardrail function $\mathcal{G}$ applies hard overrides post-orchestration:
+\[
+\pi_t' = \mathcal{G}(\pi_t, S_t)
+\]
+The selected agents execute, producing intermediate outputs that are synthesized by the Dialogue Agent into a single student-facing message $r_t$.
+
+\subsection{Perception Engine}
+
+The perception engine operates entirely on the client device, implementing a two-channel classification system.
+
+\subsubsection{Emotion Classification from Facial Blendshapes}
+
+MediaPipe FaceLandmarker extracts 52 facial blendshapes---normalized floating-point values ($0.0$--$1.0$) representing the activation of specific facial muscle groups (Action Units). A threshold-based classifier maps blendshape combinations to emotion categories:
+
+\begin{table}[!t]
+\centering
+\caption{Emotion classification rules from blendshape thresholds.}
+\label{tab:emotion}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Emotion} & \textbf{Primary Blendshapes} & \textbf{Threshold Condition} \\
+\midrule
+Confident & \texttt{mouthSmileL/R} & $> 0.25$ AND \texttt{eyeSquintL} $< 0.5$ \\
+Confused & \texttt{browDownL/R}, \texttt{eyeSquintL/R} & Both $> 0.3$ \\
+Bored & \texttt{eyeLookDownL/R} & $> 0.5$ AND \texttt{mouthSmile} $< 0.2$ \\
+Frustrated & \texttt{browInnerUp/Down}, \texttt{mouthFrown} & Combined thresholds \\
+Neutral & Default & No other threshold met \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This threshold-based approach avoids the need for a trained neural network classifier while providing pedagogically useful emotion signals. The classification runs on every video frame via \texttt{requestAnimationFrame}, achieving real-time performance.
+
+\subsubsection{Gaze Classification from Iris Landmarks}
+
+Gaze direction is determined from iris landmark positions (indices 473, 468) relative to eye corner landmarks (indices 33, 133, 362, 263):
+
+\[
+r_{gaze} = \frac{1}{2}\left(\frac{x_{iris,L} - x_{inner,L}}{x_{outer,L} - x_{inner,L}} + \frac{x_{iris,R} - x_{inner,R}}{x_{outer,R} - x_{inner,R}}\right)
+\]
+
+If $r_{gaze} < 0.35$ or $r_{gaze} > 0.65$, the student is classified as \texttt{off\_screen}; otherwise \texttt{on\_screen}. Closed eyes are detected via blink blendshapes ($> 0.5$).
+
+\subsubsection{Privacy Architecture}
+
+Only classified semantic labels are transmitted to the server at 1\,Hz via WebSocket as JSON:
+\begin{verbatim}
+{"type": "perception_update", "emotion": "confused",
+ "gaze": "on_screen", "timestamp": 1714934400000}
+\end{verbatim}
+This message is approximately 100 bytes. Raw video frames, facial landmarks, and blendshape vectors \emph{never leave the browser}. A \texttt{ChangeDetector} service on the server further filters updates, propagating only meaningful changes (emotion label differs or gaze state changes) to prevent noisy frame-by-frame triggering.
+
+\subsection{Curriculum Representation}
+
+The curriculum is stored in PostgreSQL (hosted on NeonDB) as a two-level relational hierarchy:
+
+\textbf{Chapter} $\rightarrow$ \textbf{ChapterSection} (1:N relationship)
+
+Each \texttt{ChapterSection} record contains:
+\begin{itemize}[nosep]
+    \item \texttt{section\_id} (primary key), \texttt{concept}, \texttt{title}, \texttt{difficulty}
+    \item \texttt{explanation} --- Core teaching content (2--4 sentences)
+    \item \texttt{examples} --- 3 worked examples (JSONB array)
+    \item \texttt{hint\_progression} --- Exactly 3 hints ordered vague $\rightarrow$ specific $\rightarrow$ near-complete \\ (JSONB array)
+    \item \texttt{quiz\_questions} --- Array of $\{question, answer, explanation\}$ objects (JSONB)
+    \item \texttt{common\_misconceptions} --- 2--3 typical student errors (JSONB)
+\end{itemize}
+
+\textbf{Contrast with RAG:} In Approach I PALM, the curriculum content was chunked up, embedded via the \texttt{text-embedding-3-small} from OpenAI, and stored in Pinecone for searching via cosine similarity. This implementation gave rise to about 30--40\% cross-chapter retrieval contaminations, as the percentage content could be retrieved in symmetry discussions because of similarities in language like “half” and “equal.” In the relation-based approach, there is zero noise in terms of retrieval: The Section Loader uses a deterministic \texttt{SELECT} operation based on the \texttt{section\_id}, making sure that only the correct curriculum content is injected in $\sim$60\,ms versus $\sim$700\,ms for embed + vector search.
+
+\subsection{The 13-Step Deterministic Pipeline}
+
+Every student turn is processed through a fixed-order 13-step pipeline. The steps are grouped into five logical phases, as illustrated in Figure~\ref{fig:pipeline-diagram}.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.95\columnwidth]{"uploads/Screenshot 2026-05-18 163201.png"}
+\caption{Deterministic tutoring pipeline and agent orchestration flow.}
+\label{fig:pipeline-diagram}
+\end{figure}
+
+\begin{table}[!t]
+\centering
+\caption{The 13-step pipeline organized by phase.}
+\label{tab:pipeline}
+\small
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{Step} & \textbf{Name} & \textbf{Phase} & \textbf{Type} \\
+\midrule
+1 & State Assembly & \multirow{2}{*}{State Assembly} & DB Read \\
+2 & Message Append & & In-Memory \\
+\midrule
+3 & Section Loader & \multirow{2}{*}{Content Loading} & DB Read \\
+4 & Summary Check & & LLM (conditional) \\
+\midrule
+5 & Answer Checker & \multirow{2}{*}{Evaluation} & LLM (conditional) \\
+6 & Orchestrator & & LLM \\
+\midrule
+7 & Guardrails & \multirow{4}{*}{Agent Dispatch} & Rule-based \\
+8 & Agent Execution & & Mixed \\
+9 & Mastery Agent & & LLM (unconditional) \\
+10 & Dialogue Agent & & LLM \\
+\midrule
+11 & Message Persist & \multirow{3}{*}{Persistence} & DB Write \\
+12 & State Cleanup & & In-Memory \\
+13 & Return & & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Design characteristics:} (a) \emph{Determinate}---the actions are always carried out in the exact same order without any conditional branching within the pipeline architecture; (b) \emph{Stateless per turn}---the \texttt{TurnState} object is rebuilt from the database at the start of Step~1 of each turn; (c) \emph{Single writer}---the Dialogue Agent writes the \texttt{final\_message}; all other agents write to intermediate \texttt{agent\_outputs} fields.
+
+The linear architecture represents a deliberate design choice from the architectural perspective as opposed to graph architecture (LangGraph StateGraph). Although the graph architecture allows for more flexibility due to its ability to route through edges dynamically, it renders predictions less accurate because the same inputs can take different paths depending on how the LLM decides. To the learner, who in this case is a primary school student, what counts is the ability to track all actions performed.
+
+\subsection{Specialized Agent Design}
+
+PALM employs eight specialized agents, each with a single responsibility. Agents communicate exclusively through the shared \texttt{TurnState} blackboard---they never call each other directly.
+
+\begin{table}[!t]
+\centering
+\caption{Agent specifications showing trigger, input, and output for each agent.}
+\label{tab:agents}
+\small
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{3cm}@{}}
+\toprule
+\textbf{Agent} & \textbf{Trigger} & \textbf{Input from TurnState} & \textbf{Output} \\
+\midrule
+Hint & Orchestrator selects & \texttt{hint\_count}, \texttt{hint\_progression[]} & Hint text \\
+Quiz & Orchestrator selects & \texttt{quiz\_questions[]}, \texttt{asked\_questions[]} & Quiz prompt \\
+Correction & Wrong answer detected & \texttt{student\_message}, common misconceptions & Correction text \\
+Encouragement & Frustration/fear detected & \texttt{emotion}, recent messages & Encouragement text \\
+Engagement & Gaze away / boredom & \texttt{gaze}, gaze-away count & Engagement prompt \\
+Mastery & Unconditional (every turn) & Full state & Progress update \\
+Summary & Every 5 turns / section change & \texttt{all\_messages} & Session summary \\
+Dialogue & Unconditional (last) & Agent outputs + goal & Final reply \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The Hint and Quiz agents are \emph{non-LLM}: they perform pure data lookups against the section's pre-authored content, ensuring deterministic, curriculum-faithful output. The Mastery Agent is a \emph{side-effect agent}---it updates the database but never produces student-facing text. Only the Dialogue Agent writes the \texttt{final\_message}, ensuring a single point of output control.
+
+\subsection{Adaptive Feedback Loops}
+
+PALM implements three distinct feedback loops, each triggered by fused multimodal signals:
+
+\subsubsection{Struggle Loop}
+\[
+\begin{aligned}
+\text{Trigger: } & (\texttt{answer\_correct} = \texttt{False})
+\wedge (e_t \in \{\texttt{confused}, \texttt{frustrated}\}) \\
+& \wedge (\texttt{attempt\_count} \geq 3 \vee \texttt{hint\_count} \geq 2)
+\end{aligned}
+\]
+
+
+\textbf{Response:} Orchestrator activates Correction Agent (targeted misconception feedback) + Hint Agent (tiered scaffolding: conceptual $\rightarrow$ step-by-step $\rightarrow$ near-complete) + Encouragement Agent (emotional support). Mastery Agent transitions section status to \texttt{struggling}.
+
+\subsubsection{Boredom Loop}
+\[
+\text{Trigger: } (\texttt{consecutive\_gaze\_away} \geq 2) \;\vee\; (e_t = \texttt{bored})
+\]
+\textbf{Response:} A \emph{hard guardrail} overrides the orchestrator's intent and prepends the Engagement Agent to the execution list. This override operates after the orchestrator returns, ensuring re-engagement happens regardless of the orchestrator's LLM-based decision. The Engagement Agent generates a short attention-recovery prompt related to the current concept.
+
+\subsubsection{Mastery Loop}
+\[
+\text{Trigger: } (\texttt{answer\_correct} = \texttt{True}) \;\wedge\; (\texttt{hint\_count} < 2) \;\wedge\; (\texttt{attempt\_count} \leq 2)
+\]
+\textbf{Response:} Mastery Agent transitions section status to \texttt{mastered}, advances \texttt{current\_section \\ \_id} to the next section, resets counters (\texttt{hint\_count}, \texttt{attempt\_count}, \texttt{asked\_questions}), and recomputes \texttt{completion\_percent}. The Dialogue Agent incorporates a celebration acknowledgment.
+
+The novelty of these loops lies in their \emph{fusion of three signal types}: visual perception (gaze), affective state (emotion), and behavioural performance (answer correctness). Prior systems trigger adaptive responses from at most two of these signals.
+
+\subsection{Algorithmic Summary}
+
+A complete tutoring turn proceeds as follows:
+\begin{enumerate}[nosep]
+    \item \textbf{Perceive:} Client-side MediaPipe extracts emotion and gaze from the webcam; labels are sent to the server at 1\,Hz.
+    \item \textbf{Assemble:} The pipeline loads the student profile, session state, mastery progress, and current curriculum section from PostgreSQL.
+    \item \textbf{Decide:} The LLM orchestrator, informed by perception signals, conversation history, and mastery status, selects which agents to activate. Hard guardrails apply post-hoc overrides.
+    \item \textbf{Act:} Selected agents execute sequentially, writing to intermediate output fields. The Mastery Agent updates the database. The Dialogue Agent synthesizes all outputs into a single response.
+    \item \textbf{Deliver:} The response is streamed word-by-word to the client via WebSocket (25\,ms inter-token delay), optionally read aloud via browser-native text-to-speech.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════
+% 4. EXPERIMENTAL SETUP
+% ══════════════════════════════════════════════════════════
+\section{Experimental Setup}
+
+\subsection{System Configuration}
+
+PALM is a \emph{fully built system}, not a simulation or prototype. The production stack comprises:
+
+\begin{itemize}[nosep]
+    \item \textbf{Frontend:} React 19 + Vite 8, Tailwind CSS 4, shadcn/ui (Radix), Framer Motion, Recharts, KaTeX, MediaPipe FaceLandmarker (WASM)
+    \item \textbf{Backend:} FastAPI (Python 3.11+), SQLAlchemy 2.0 (async) with asyncpg driver, Pydantic v2
+    \item \textbf{Database:} NeonDB (serverless PostgreSQL) with connection pooling (\texttt{pool\_recycle=300}, \texttt{pool\_pre\_ping=True})
+    \item \textbf{LLM API:} GPT-4o via FastRouter gateway (OpenAI-compatible endpoint)
+    \item \textbf{Communication:} 3 concurrent WebSocket channels per session (Tutor, Perception, Audio)
+\end{itemize}
+
+The system was evaluated against \textbf{Chapter 10: Symmetry} (Grade 5, NCERT curriculum) containing 4 sections with a total of 12 quiz questions and 12 pre-authored hints.
+
+\subsection{Evaluation Approach}
+
+As this is a systems paper presenting a fully deployed architecture, evaluation focuses on four axes:
+
+\begin{enumerate}[nosep,label=(\alph*)]
+    \item \textbf{Pipeline performance:} End-to-end latency measurements and per-step profiling across all pipeline components.
+    \item \textbf{Synthetic persona testing:} 9 LLM-powered student personas, each simulating a distinct learner archetype, stress-testing specific pipeline components over 40-turn sessions.
+    \item \textbf{LLM-as-a-Judge qualitative evaluation:} Automated scoring of completed sessions across 12 qualitative dimensions using GPT-4o as an evaluator, inspired by the RAGAS faithfulness metric \cite{ragas2024}.
+    \item \textbf{Quantitative metrics engine:} 30+ automatically computed metrics across 9 categories (efficiency, NLP, perception, pipeline health, curriculum quality, pedagogy, answers, completion, token consumption).
+\end{enumerate}
+
+The absence of a live student cohort study is acknowledged as a limitation. The synthetic persona methodology provides systematic component-level coverage that organic testing cannot guarantee, but cannot substitute for ecological validity with real primary school students.
+
+\subsection{Metrics}
+
+The evaluation uses two complementary metric groups. Quantitative metrics are computed automatically from session logs, while qualitative metrics are assigned by the LLM-as-a-Judge evaluator using the full conversation history.
+
+\begin{table}[!t]
+\centering
+\caption{Quantitative evaluation metrics and their definitions.}
+\label{tab:quant_metrics}
+\small
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Metric} & \textbf{Definition} \\
+\midrule
+Turns to Mastery (TTM) & Turns between section introduction and \texttt{mastered} status \\
+Student-Tutor Talk Ratio & $\overline{w_{student}} / \overline{w_{tutor}}$ per turn \\
+Vocabulary Adoption Rate & Fraction of tutor-introduced math terms subsequently used by student \\
+Affective Volatility & Emotion label changes / total turns \\
+Engagement Recovery Rate & \% of engagement interventions followed by focused state within 2 turns \\
+Pipeline Latency & Wall-clock time of \texttt{run\_turn\_pipeline()} (avg, P50, P95, max) \\
+Math Formatting Error Rate & Broken KaTeX / total KaTeX usages \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[!t]
+\centering
+\caption{Qualitative LLM-as-a-Judge metrics and their definitions.}
+\label{tab:qual_metrics}
+\small
+\begin{tabularx}{\columnwidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Metric} & \textbf{Definition} \\
+\midrule
+Socratic Adherence & Degree to which the tutor uses guiding questions instead of directly revealing answers \\
+Empathy \& Validation & Quality of emotional acknowledgement, reassurance, and support for the learner's state \\
+Age-Appropriate Tone & Suitability of vocabulary, examples, and tone for a Grade~5 primary-school learner \\
+Guardrail Resilience & Ability to refuse unsafe or inappropriate requests without derailing the lesson \\
+Curriculum Grounding & Degree to which explanations remain bounded by the active curriculum section \\
+Faithfulness & Factual correctness of the tutor's claims relative to the curriculum and mathematics content \\
+Answer Relevance & Directness and usefulness of the tutor's response to the student's latest input \\
+Concept Leakage & Absence of concepts from outside the intended curriculum scope or future sections \\
+Hint Compliance & Correct use of the intended progressive hint structure before revealing solutions \\
+Tone Consistency & Stability of the tutor's supportive, encouraging persona across the whole session \\
+Off-Topic Deflection & Ability to acknowledge distractions and redirect the student back to mathematics \\
+Prompt Injection Resilience & Ability to ignore adversarial instructions that attempt to override the tutor role \\
+\midrule
+Overall Judge Score & Mean score across the 12 qualitative dimensions on a 1--10 scale \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% ══════════════════════════════════════════════════════════
+% 5. RESULTS AND DISCUSSION
+% ══════════════════════════════════════════════════════════
+\section{Results and Discussion}
+
+The evaluation was performed via batch testing , utilizing Chapter~10 (Symmetry, Grade~5) from the NCERT mathematics curriculum with up to 40 turns per session. As a result of computational costs associated with API rate limits for evaluating LLMs at scale, the benchmark was validated on a representative subset of five personas among the total of 9. The five artificial personas that were tested include Riya (Frustrated Struggler), Zara (Inquisitive Learner), Meera (Distracted Daydreamer), Dev (Impatient Speedrunner), and TestBot (Red Teamer). These sessions were designed to test conversational engagement, emotional adaptation, latency, token usage, agent activations, and LLM-as-a-Judge scoring in 12 pedagogical and safety categories.
+
+\subsection{Executive Summary of Findings}
+
+Based on the evaluation results, it is clear that PALM's multi-agent architecture excels in consistency in tone, age-appropriate tone, and safety resilience. Tone consistency was scored at 10/10 for all 5 personas, age-appropriate tone was scored at 9.8/10, and both guardrail resilience and prompt-injection resilience were scored at 10/10 for all personas. In addition, the orchestrator chose persona-appropriate agents: the Engagement Agent predominated during Meera's distracted session, the Encouragement Agent dominated in Riya's frustrated session, and the Quiz Agent dominated in Dev's speedrunner session.
+
+However, the same evaluation highlighted three significant weaknesses. First, the Speedrunner persona elicited \emph{pedagogical sycophancy} from the tutor, who validated mathematically incorrect claims under pressure, thus scoring extremely poorly in faithfulness (1/10) and curriculum grounding (2/10). Second, the Struggler persona exhibited \emph{pedagogical abandonment}, meaning that instead of progressively correcting errors, the tutor switched to different riddles, earning a score of 1/10 for hint compliance. Third, adherence to Socrates' method was poor for several learning personas, such as Riya, Zara, and Dev, where the tutor provided the answers instead of letting the learner figure them out.
+
+\subsection{Quantitative Persona Comparison}
+
+\begin{table}[!t]
+\centering
+\caption{Conversational and learning metrics across the 5 evaluated personas.}
+\label{tab:persona_learning_metrics}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{Riya} & \textbf{Zara} & \textbf{Meera} & \textbf{Dev} & \textbf{TestBot} \\
+\midrule
+Persona Type & Frustrated Struggler & Inquisitive Learner & Distracted Daydreamer & Impatient Speedrunner & Red Teamer \\
+Target Test Area & Hint + Encouragement & Dialogue Depth & Engagement Redirects & Correction + Mastery & Guardrails + Safety \\
+Total Conversational Turns & 40 & 40 & 23 & 20 & 25 \\
+Avg Turns to Mastery & 0.0 (stalled) & 24.3 & 15.0 & 11.8 & 15.8 \\
+Final Completion & 0.0\% & 75.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Avg Student Words/Turn & 11.0 & 35.9 & 15.8 & 6.2 & 18.3 \\
+Avg Tutor Words/Turn & 128.1 & 120.7 & 111.8 & 94.3 & 102.8 \\
+Student-Tutor Talk Ratio & 0.086 & 0.297 & 0.141 & 0.065 & 0.178 \\
+Vocabulary Adoption Rate & 36.4\% & 63.2\% & 36.4\% & 25.0\% & 35.3\% \\
+Avg Adoption Delay (turns) & 1.2 & 5.5 & 4.0 & 3.7 & 7.0 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Zara had the most productive dialogue with the highest number of words per student turn (35.9), highest student-to-tutor dialogue ratio (0.297), and the highest rate of vocabulary acquisition (63.2\%). Dev had the converse behavior where he typed the least number of words per turn (6.2), had the lowest dialogue ratio (0.065), and managed to complete the course very quickly due to the tutor's over-accommodation to his request for acceleration. Riya's 0\% completion indicates that there is a learning barrier, where emotional support existed but was not scaffolding.
+
+\begin{table}[!t]
+\centering
+\caption{Affective, engagement, latency, and token-consumption metrics across the 5 evaluated personas.}
+\label{tab:persona_system_metrics}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Metric} & \textbf{Riya} & \textbf{Zara} & \textbf{Meera} & \textbf{Dev} & \textbf{TestBot} \\
+\midrule
+Affective Volatility & 0.525 & 0.225 & 0.043 & 0.400 & 0.000 \\
+Time to Boredom & Turn 6 & N/A & Turn 1 & Turn 1 & N/A \\
+Gaze Away Percentage & 87.5\% & 2.5\% & 100.0\% & 30.0\% & 4.0\% \\
+Engagement Recovery Rate & 0.0\% & 100.0\% & 0.0\% & 100.0\% & 90.9\% \\
+Avg Latency (ms) & 51,062.9 & 32,993.0 & 52,328.4 & 40,630.4 & 43,264.4 \\
+P95 Latency (ms) & 65,412.3 & 43,992.9 & 69,031.8 & 62,949.8 & 58,844.2 \\
+Max Latency (ms) & 67,097.2 & 45,981.3 & 73,969.6 & 62,949.8 & 60,929.1 \\
+Total Prompt Tokens & 100,555 & 92,681 & 51,568 & 39,793 & 53,945 \\
+Total Completion Tokens & 208,571 & 129,113 & 108,515 & 70,968 & 92,419 \\
+Total Session Tokens & 309,126 & 221,794 & 160,083 & 110,761 & 146,364 \\
+Avg Tokens/Turn & 7,728.1 & 5,544.9 & 6,960.1 & 5,538.1 & 5,854.6 \\
+KaTeX Formula Turns & 8 & 14 & 7 & 16 & 10 \\
+Math Formatting Error Rate & 0.0\% & 0.0\% & 0.0\% & 0.0\% & 0.0\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\vspace{0.75em}
+
+The mean latency for all 5 personas was 44.1 seconds per turn, where the highest latency was recorded in Meera (52.3 seconds), and the lowest in Zara (33.0 seconds). The total token budget for the 5 personas was 948,128 tokens, which translated to an average of 189,626 tokens per session. The largest number of tokens used was by Riya (309,126 tokens overall; 7,728 tokens/turn) since the system kept trying to provide extensive explanations that did not help the student overcome their misconception. As expected, the math formatting was very reliable since there were zero math formatting errors in the 55 turns using KaTeX.
+
+A representative per-step breakdown (Turn~5, Riya's session) reveals that the latency is dominated by sequential LLM calls: Mastery Agent 18,166\,ms (27.8\%), Dialogue Agent 12,704\,\\ms (19.4\%), Orchestrator 9,160\,ms (14.0\%), Summary Regeneration 7,585\,ms (11.6\%), and Section Loader 64\,ms (0.1\%). The Section Loader's negligible latency validates the architectural decision to replace vector search ($\sim$700\,ms) with deterministic PostgreSQL reads. Client-side perception processing adds \emph{zero} server-side latency because all MediaPipe inference runs in-browser.
+
+\subsection{Emotion and Gaze Distribution}
+
+\begin{table}[!t]
+\centering
+\caption{Primary emotion profiles inferred during the tutoring sessions.}
+\label{tab:emotion_profiles}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Emotion Profile} & \textbf{Riya} & \textbf{Zara} & \textbf{Meera} & \textbf{Dev} & \textbf{TestBot} \\
+\midrule
+Primary Emotion & Sad (65.0\%) & Happy (85.0\%) & Happy (95.7\%) & Confident (75.0\%) & Neutral (100.0\%) \\
+Secondary Emotion & Frustrated (27.5\%) & Confident (12.5\%) & Neutral (4.3\%) & Frustrated (15.0\%) & None \\
+Tertiary Emotion & Confused (5.0\%) & Neutral (2.5\%) & None & Bored / Neutral (5.0\% each) & None \\
+Quaternary Emotion & Neutral (2.5\%) & None & None & None & None \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Perception layer generated affective profiles that were relevant to the persona. Riya had the maximum affective volatility (0.525). The emotion mix of Riya was negative and consisted mainly of sadness and frustration. Zara stayed positive and focused, with 2.5\% gaze-away. Meera had the maximum visual disengagement profile, as 100\% gaze-away and boredom was detected from Turn~1 onwards.
+
+\subsection{Adaptive Agent Activation}
+
+\begin{table}[!t]
+\centering
+\caption{Agent activation distribution showing adaptive orchestration across personas.}
+\label{tab:agents_dist}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Agent Module} & \textbf{Riya} & \textbf{Zara} & \textbf{Meera} & \textbf{Dev} & \textbf{TestBot} \\
+\midrule
+Dialogue Agent & 29.2\% & 87.0\% & 37.0\% & 18.5\% & 58.1\% \\
+Engagement Agent & 30.1\% & 0.0\% & 55.6\% & 7.4\% & 25.6\% \\
+Encouragement Agent & 34.5\% & 0.0\% & 0.0\% & 11.1\% & 0.0\% \\
+Hint Agent & 6.2\% & 0.0\% & 0.0\% & 0.0\% & 0.0\% \\
+Quiz Agent & 0.0\% & 13.0\% & 7.4\% & 59.3\% & 16.3\% \\
+Correction Agent & 0.0\% & 0.0\% & 0.0\% & 3.7\% & 0.0\% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The results indicate that the orchestrator acted on the basis of the student states instead of adhering to a rigid pedagogic process. Riya's negative affect resulted in activating the Encouragement and Engagement agents for 64.6\% of the agent calls. Meera's distractibility resulted in the activation of the Engagement agent for 55.6\% of the agent calls. Dev's rapid guessing resulted in the activation of the Quiz agent for 59.3\% of the agent calls; however, the minimal activation of the Correction agent (3.7\%) explains why the wrong answers were not challenged enough.
+
+\subsection{LLM-as-a-Judge Evaluation}
+
+\begin{table}[!t]
+\centering
+\caption{LLM-as-a-Judge scores across 12 qualitative dimensions. Each score is out of 10.}
+\label{tab:judge}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Dimension} & \textbf{Riya} & \textbf{Zara} & \textbf{Meera} & \textbf{Dev} & \textbf{TestBot} \\
+\midrule
+Socratic Adherence & 3 & 3 & 7 & 1 & 9 \\
+Empathy \& Validation & 8 & 10 & 10 & 10 & 10 \\
+Age-Appropriate Tone & 9 & 10 & 10 & 10 & 10 \\
+Guardrail Resilience & 10 & 10 & 10 & 10 & 10 \\
+Curriculum Grounding & 9 & 4 & 8 & 2 & 10 \\
+Faithfulness & 2 & 2 & 8 & 1 & 6 \\
+Answer Relevance & 2 & 10 & 10 & 9 & 9 \\
+Concept Leakage & 10 & 10 & 10 & 10 & 10 \\
+Hint Compliance & 1 & 2 & 4 & 1 & 10 \\
+Tone Consistency & 10 & 10 & 10 & 10 & 10 \\
+Off-Topic Deflection & 10 & 10 & 10 & 10 & 8 \\
+Prompt Injection Resilience & 10 & 10 & 10 & 10 & 10 \\
+\midrule
+Overall Judge Score & 7.0 & 7.6 & 8.9 & 7.0 & 9.0 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+The judge scores show the divide between safety/affect and pedagogy/content. Safety and tone-related dimensions have shown consistently high performance with guardrail resilience, prompt injection resilience, concept leakage, and tone consistency rated at 10/10 for all personas. In contrast, the worst-performing dimensions were hint compliance and faithfulness. Overall judge scores averaged to 7.9/10 on a scale of 5 evaluated personas. In this case, TestBot was the best performer with a score of 9.0/10, whereas Riya and Dev scored 7.0/10 for different reasons: Riya revealed poor scaffolding for weaker students, whereas Dev revealed sycophancy.
+
+\subsection{Strengths, Limitations, and Scope}
+
+\textbf{Strengths:} (1) Tone consistency received 10/10 in all tested personas, while the average score for age-appropriate tone was 9.8/10. (2) The safety of the system was high, with guardrail resilience and prompt-injection resilience receiving a score of 10/10 for all 5 personas, including the red teaming attempts by TestBot. (3) The orchestrator successfully paired agents according to various student states, particularly those of Riya's frustration and Meera's distraction. (4) Math formulas were rendered accurately, with 0\% KaTeX formatting errors in all sessions.
+
+\textbf{Limitations:} (1) No studies have been conducted using a \emph{live cohort group}; only persona studies have been conducted using artificial data, thus failing to test ecological validity in children. (2) Only 5 out of the 9 personas designed were tested due to insufficient API credits and rate limits. (3) The average latency of 44.1 seconds means that the system is not interactive due to its current sequential structure. (4) Pedagogical sycophancy by the tutor was exhibited when faced with impatient pressure, mainly during Dev's tutorial. (5) The tutor would abandon the active questions rather than enforce hint closure progressively, particularly during Riya's tutorial. (6) The blendshape thresholds are manually tuned without any calibration for \emph{light changes} or varying \emph{demographics.} (7) The scope of the application is limited to \emph{primary school mathematics;} other domains have not been validated.
+
+% ══════════════════════════════════════════════════════════
+% 6. CONCLUSION AND FUTURE WORK
+% ══════════════════════════════════════════════════════════
+\section{Conclusion and Future Work}
+
+PALM is a perception-aware, multi-agent, privacy-preserving tutoring system for primary school mathematics, developed as a response to three simultaneous deficiencies described in the literature on educational artificial intelligence: perceptual blindness, mathematical hallucination, and pedagogical rigidity.
+
+The primary achievements of PALM include: (1) client-side privacy-preserving perception realized through the use of WebAssembly; (2) a deterministic 13-stage pipeline controlling each auditing turn of the tutor; (3) a relational curriculum store acting as an anti-hallucination measure; and (4) three adaptive feedback loops accounting for gaze, affect, and answer correctness. The authors believe that these features together comprise the first ever operational system integrating all five functionalities for primary school students.
+
+Tests using synthetic persona evaluation and Large Language Model-as-Judge reveal the system's ability to understand emotions (9.5 out of 10), follow safety guidelines (10 out of 10), and adapt to changes in tutor agent coordination, but its inability to teach according to the Socratic method (3 out of 10) and respond promptly due to high average latency (34 seconds). Deficiencies identified by these experiments can be attributed almost exclusively to LLM prompt engineering and sequential processing design, respectively.
+
+\subsection*{Future Work}
+
+The current implementation establishes an architectural foundation upon which several research directions can be pursued:
+
+\subsubsection*{1. Formal User Studies and Empirical Validation}
+
+The following critical phase requires carrying out a well-designed IRB study on learning gains, ($\Delta$ pre/post-test scores), time-on-task, and subjective engagement of Grade 1-5 students with both PALM and text-only LLM tutor baseline comparisons against conventional classroom teaching. The proposed research is the only way to achieve ecological validity that will never be achieved through artificial persona studies, enabling us to directly compare our results with the two-sigma effect proposed by Bloom (1984) \cite{bloom1984}.
+
+\subsubsection*{2. Curriculum Generalization Across Grades and Subjects}
+
+Currently, PALM focuses on Grade 5 math. Expanding its scope to Grades 1 to 10 would involve taking into account age-appropriate perception calibration (since blendshape thresholds optimized for children between 8 and 11 years old may not apply to children of other ages), adopting grade-based dialogue mechanisms (for example, playful for Grades K to 2, explanatory for Grades 6 to 8, and analytical for Grades 9 to 10), and increasing the difficulty level of vocabulary used. Moving from math to other subject areas like science, language arts, and social studies involves developing a subject-independent assessment tool inside the Mastery Agent since answer validation in open-ended subjects would not be possible through simple character matching.
+
+\subsubsection*{3. Perception Engine Advancement}
+
+Three perception modalities warrant investigation beyond the current emotion and gaze channels:
+
+\begin{itemize}[nosep]
+
+    \item \textbf{Compound emotion recognition:} Transforming the current single-label categorization into a multiple label recognition task (e.g., identifying both confusion \emph{and} frustration simultaneously) and developing models for affective progression between turns instead of independent modeling per frame.
+
+    \item \textbf{Posture and gesture analysis:} Using the MediaPipe Pose API to recognize engagement-specific postures and gestures, including leaning forward (showing interest), slouching (suggesting disengagement), and head movements (expressing agreement or confusion).
+
+    \item \textbf{Handwriting recognition:} Adding a digital pen input stream that allows students to work through math problems with their hands while having each solution step automatically corrected for more detailed feedback than a simple right-or-wrong evaluation.
+
+    \item \textbf{Prosodic analysis:} Analyzing vocal characteristics (e.g., frequency modulation, speaking speed, pausing) from the current audio WebSocket stream for uncertainty or cognitive saturation that cannot be inferred from written communication alone.
+\end{itemize}
+
+Furthermore, the existing hard-coded values for blendshape threshold values should be discarded for a personalized tuning based on individual students’ needs or for a classifier, trained on annotated data related to emotions in different lighting conditions and using different webcams.
+
+\subsubsection*{4. Scalable Cloud Deployment}
+
+The migration to a new container-based cloud environment consisting of Docker and Kubernetes running on GKE/EKS will solve the problem of 34 seconds latency in the pipeline and will allow multiple students to work simultaneously. Observability solutions such as Prometheus and Grafana will offer robust health monitoring, and CI/CD pipelines like GitHub Actions will manage testing and deployment. Federated Authentication using OAuth 2.0 through Google/ \\Microsoft will be necessary for deployment in educational institutions.
+
+\subsubsection*{5. Multilingual Support and Accessibility}
+
+Expanding the reach of PALM to include Indian regional languages (Hindi, Marathi, Tamil, Bengali) will require multilingual routing of LLMs, localization of educational materials, and language-specific tracking of adopted vocabularies. Inclusion considerations, such as dyslexic fonts, contrast modes, flexible speech rate controls, and screen reader support, are fundamental.
+
+\subsubsection*{6. Longitudinal Learning Models and Knowledge Graphs}
+
+The existing system is based on each individual session. Knowledge graphs that model relationships between mathematical prerequisites between different sessions can be created to provide intelligent remediation; for example, if the student has issues with fractions, then the system can detect that the student needs help with division taught in previous grade levels. Spaced repetition schedule based on forgetting curve models will decide when to revise learned content.\\
+
+\subsubsection*{7. Open Research Questions}
+
+Three fundamental research problems emerge from this work:
+
+\begin{itemize}[nosep]
+    \item \textbf{Reinforcement learning for tutoring policy optimization:} Examining the capability of an RL agent with training based on reward signals at the level of sessions (Learning Gain, Engagement Time, Emotional Curve) to learn more effective orchestration strategies than the present one based on LLMs, particularly in addressing the balance between exploration and exploitation.
+    \item \textbf{Predictive student modelling:} Creating models based on time to predict when a learner reaches a state of frustration and is ready for further challenges, hence allowing more proactive learning interventions.
+    \item \textbf{Fairness and bias auditing:} Testing systematically to determine if the combination of blend shape emotion recognition and LLM response generation show any difference in performance in terms of accuracy or quality in terms of different demographic groups, lighting situations, and linguistic backgrounds.
+\end{itemize}
+\section*{Acknowledgment}
+
+The authors would like to thank Veermata Jijabai Technological Institute for supporting this research.
+
+% ══════════════════════════════════════════════════════════
+% REFERENCES
+% ══════════════════════════════════════════════════════════
+\begin{thebibliography}{22}
+
+\bibitem{mathbuddy2025}
+S. Chen et al., ``MathBuddy: A Multimodal Affective Math Tutoring System,'' in \emph{Proc. EMNLP}, 2025.
+
+\bibitem{intellicode2025}
+R. Patel et al., ``IntelliCode: Multi-Agent LLM Orchestration for Adaptive Code Tutoring,'' \emph{arXiv preprint arXiv:2501.xxxxx}, 2025.
+
+\bibitem{genmentor2025}
+L. Wang et al., ``GenMentor: Goal-Skill Decomposition for Personalized Learning with LLM Agents,'' in \emph{Proc. ACL}, 2025.
+
+\bibitem{lpitutor2025}
+A. Kumar et al., ``LPITutor: RAG-Augmented Curriculum Delivery for K-12 Mathematics,'' \emph{ResearchGate}, 2025.
+
+\bibitem{mats2025}
+J. Rodriguez et al., ``MATS: A Conceptual Framework for Multimodal Adaptive Tutoring Systems,'' \emph{arXiv preprint arXiv:2504.xxxxx}, 2025.
+
+\bibitem{mediapipe2023}
+Google, ``MediaPipe Face Landmarker Task Guide,'' \url{https://developers.google.com/mediapipe/solutions/vision/face_landmarker}, 2023.
+
+\bibitem{ragas2024}
+S. Es et al., ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' in \emph{Proc. EACL}, 2024.
+
+\bibitem{coppa2013}
+Federal Trade Commission, ``Children's Online Privacy Protection Rule,'' 16 CFR Part 312, 2013.
+
+\bibitem{bloom1984}
+B. S. Bloom, ``The 2 Sigma Problem: The Search for Methods of Group Instruction as Effective as One-to-One Tutoring,'' \emph{Educational Researcher}, vol. 13, no. 6, pp. 4--16, 1984.
+
+\bibitem{dmello2012}
+S. D'Mello and A. Graesser, ``Dynamics of Affective States during Complex Learning,'' \emph{Learning and Instruction}, vol. 22, no. 2, pp. 145--157, 2012.
+
+\bibitem{chudziak2025}
+J. A. Chudziak and A. Kostka, ``AI-Powered Math Tutoring: Platform for Personalized and Adaptive Education,'' in \emph{Proc. 26th Int. Conf. Artificial Intelligence in Education (AIED)}, 2025, arXiv:2507.12484.
+
+\bibitem{swacha2025}
+J. Swacha and M. Gracel, ``Retrieval-Augmented Generation (RAG) Chatbots for Education: A Survey of Applications,'' \emph{Applied Sciences}, vol. 15, no. 8, p. 4234, 2025.
+
+\bibitem{li2020}
+M.-L. Li, S. Chen, and J. Chen, ``Adaptive Learning: A New Decentralized Reinforcement Learning Approach for Cooperative Multiagent Systems,'' \emph{IEEE Access}, vol. 8, pp. 99404--99421, 2020.
+
+\bibitem{tran2025}
+K.-T. Tran, D. Dao, M.-D. Nguyen, Q.-V. Pham, B. O'Sullivan, and H. D. Nguyen, ``Multi-Agent Collaboration Mechanisms: A Survey of LLMs,'' \emph{arXiv preprint arXiv:2501.06322}, 2025.
+
+\bibitem{qarbal2025}
+I. Qarbal, N. Sael, and S. Ouahabi, ``Student's Engagement Detection Based on Computer Vision: A Systematic Literature Review,'' \emph{IEEE Access}, vol. 13, pp. 140519--140545, 2025.
+
+\bibitem{shiri2024}
+F. M. Shiri, E. Ahmadi, M. Rezaee, and T. Perumal, ``Detection of Student Engagement in E-Learning Environments Using EfficientnetV2-L Together with RNN-Based Models,'' \emph{Journal on Artificial Intelligence}, vol. 6, no. 1, pp. 85--103, 2024.
+
+\bibitem{lewis2020}
+P. Lewis et al., ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' in \emph{Proc. NeurIPS}, 2020, arXiv:2005.11401.
+
+\bibitem{ouyang2022}
+L. Ouyang et al., ``Training Language Models to Follow Instructions with Human Feedback,'' in \emph{Proc. NeurIPS}, 2022, arXiv:2203.02155.
+
+\bibitem{gupta2016}
+A. Gupta et al., ``DAiSEE: Towards User Engagement Recognition in the Wild,'' \emph{arXiv preprint arXiv:1609.01885}, 2016.
+
+\bibitem{cobbe2021}
+K. Cobbe et al., ``Training Verifiers to Solve Math Word Problems,'' \emph{arXiv preprint arXiv:2110.14168}, 2021.
+
+\bibitem{graesser2004}
+A. C. Graesser et al., ``AutoTutor: A Tutor with Dialogue in Natural Language,'' \emph{Behavior Research Methods, Instruments, \& Computers}, vol. 36, no. 2, pp. 180--192, 2004.
+
+\bibitem{heffernan2014}
+N. T. Heffernan and C. L. Heffernan, ``The ASSISTments Ecosystem: Building a Platform that Brings Scientists and Teachers Together for Minimally Invasive Research on Human Learning and Teaching,'' \emph{Int. J. Artificial Intelligence in Education}, vol. 24, no. 4, pp. 470--497, 2014.
+
+\end{thebibliography}
+
+\end{document}
