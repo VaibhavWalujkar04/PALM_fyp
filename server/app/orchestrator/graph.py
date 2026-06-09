@@ -12,7 +12,7 @@ Graph topology::
                           ├─ engagement ─────────── engagement_node ────────────── END
                           ├─ mastery_remedial ───── mastery_remedial_node ──────── END
                           ├─ mastery_quiz ────────── mastery_advance_node → quiz_node → END
-                          └─ rag_dialogue ────────── rag_node → dialogue_node ──── END
+                          └─ dialogue ────────────── dialogue_node ─────────────── END
 
 Usage::
 
@@ -33,7 +33,6 @@ from app.agents.engagement_agent import engagement_agent
 from app.agents.hint_agent import hint_agent
 from app.agents.mastery_agent import mastery_agent
 from app.agents.quiz_agent import quiz_agent
-from app.agents.rag_agent import rag_agent
 from app.db.session import async_session_factory
 
 from app.orchestrator.router import (
@@ -41,7 +40,7 @@ from app.orchestrator.router import (
     ROUTE_HINT,
     ROUTE_MASTERY_QUIZ,
     ROUTE_MASTERY_REMEDIAL,
-    ROUTE_RAG_DIALOGUE,
+    ROUTE_DIALOGUE,
     route_student,
 )
 from app.orchestrator.state import OrchestratorState
@@ -199,42 +198,13 @@ async def quiz_node(state: OrchestratorState) -> dict[str, Any]:
     }
 
 
-# ── Chain route: rag_dialogue (RAG → Dialogue) ──────────────────────────
-
-
-async def rag_node(state: OrchestratorState) -> dict[str, Any]:
-    """Invoke the RAG Agent (curriculum-grounded retrieval).
-
-    First node in the ``rag_dialogue`` chain.  Retrieves curriculum
-    context and generates a grounded response that the Dialogue Agent
-    can then refine.
-    """
-    prompt = state["state_prompt"]
-    response = await rag_agent(prompt)
-
-    logger.info(
-        "🤖 [RAG Node] Retrieved Curriculum Context\n"
-        "   ┝ Chunks loaded: %s\n"
-        "   ┕ Response: %s  session=%s",
-        response.metadata.get("chunks_after_rerank"),
-        response.text.replace('\n', ' '),
-        prompt.session_id,
-    )
-
-    return {
-        "agent_responses": [response],
-        "final_response": response.text,
-        "agent_used": response.agent,
-    }
+# ── Fallback route: dialogue ──────────────────────────────────────────
 
 
 async def dialogue_node(state: OrchestratorState) -> dict[str, Any]:
     """Invoke the Dialogue Agent (Socratic conversational tutor).
 
-    When used in the ``rag_dialogue`` chain, this runs *after*
-    ``rag_node``.  The RAG context is already embedded in the
-    StatePrompt's conversation history / session summary, so the
-    Dialogue Agent naturally builds on it.
+    This runs as the fallback conversational route.
     """
     prompt = state["state_prompt"]
     response = await dialogue_agent(prompt)
@@ -276,7 +246,6 @@ def build_graph() -> StateGraph:
     graph.add_node("mastery_remedial_node", mastery_remedial_node)
     graph.add_node("mastery_advance_node", mastery_advance_node)
     graph.add_node("quiz_node", quiz_node)
-    graph.add_node("rag_node", rag_node)
     graph.add_node("dialogue_node", dialogue_node)
 
     # ── Entry point ──────────────────────────────────────────────────
@@ -291,7 +260,7 @@ def build_graph() -> StateGraph:
             ROUTE_ENGAGEMENT: "engagement_node",
             ROUTE_MASTERY_REMEDIAL: "mastery_remedial_node",
             ROUTE_MASTERY_QUIZ: "mastery_advance_node",
-            ROUTE_RAG_DIALOGUE: "rag_node",
+            ROUTE_DIALOGUE: "dialogue_node",
         },
     )
 
@@ -304,7 +273,6 @@ def build_graph() -> StateGraph:
     graph.add_edge("mastery_advance_node", "quiz_node")
     graph.add_edge("quiz_node", END)
 
-    graph.add_edge("rag_node", "dialogue_node")
     graph.add_edge("dialogue_node", END)
 
     return graph

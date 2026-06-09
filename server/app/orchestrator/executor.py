@@ -10,8 +10,8 @@ Usage::
 
     result = await run_orchestrator(state_prompt)
     print(result.final_response)   # text for the student
-    print(result.agent_used)       # "hint_agent", "rag_agent", etc.
-    print(result.route)            # "hint", "rag_dialogue", etc.
+    print(result.agent_used)       # "hint_agent", "dialogue_agent", etc.
+    print(result.route)            # "hint", "dialogue", etc.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ class OrchestratorResult(BaseModel):
         Name of the primary agent that produced the final response.
     route : str
         The route the orchestrator selected (e.g. ``"hint"``,
-        ``"rag_dialogue"``).
+        ``"dialogue"``).
     all_responses : list[AgentResponse]
         Every ``AgentResponse`` produced during the pipeline (useful
         for logging, debugging, or downstream analytics).

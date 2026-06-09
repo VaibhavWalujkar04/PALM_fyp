@@ -33,14 +33,14 @@ ROUTE_MASTERY_REMEDIAL = "mastery_remedial"
 ROUTE_ENGAGEMENT = "engagement"
 ROUTE_HINT = "hint"
 ROUTE_MASTERY_QUIZ = "mastery_quiz"
-ROUTE_RAG_DIALOGUE = "rag_dialogue"
+ROUTE_DIALOGUE = "dialogue"
 
 ALL_ROUTES = frozenset({
     ROUTE_MASTERY_REMEDIAL,
     ROUTE_ENGAGEMENT,
     ROUTE_HINT,
     ROUTE_MASTERY_QUIZ,
-    ROUTE_RAG_DIALOGUE,
+    ROUTE_DIALOGUE,
 })
 
 # ── Thresholds ───────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ def route_student(state: OrchestratorState) -> str:
     logger.info(
         "🧭 [Router] Route chosen: %s\n"
         "   ┕ Reason: Fallback to standard curriculum-supported dialogue.  session=%s",
-        ROUTE_RAG_DIALOGUE,
+        ROUTE_DIALOGUE,
         prompt.session_id,
     )
-    return ROUTE_RAG_DIALOGUE
+    return ROUTE_DIALOGUE
