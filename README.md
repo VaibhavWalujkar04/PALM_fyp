@@ -209,4 +209,4 @@ PALM uses a **blackboard-architecture** where a shared state object flows throug
 
 ## 📄 License
 
-This project was developed as a Final Year Project (FYP) at university. All rights reserved.
+This project was developed as a Final Year Project (FYP) at Veermata Jijabai Technological Institute. All rights reserved.
