@@ -1,0 +1,38 @@
+# ── Environment & Secrets ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ── Node ──────────────────────────────────────────────────────────────
+node_modules/
+dist/
+
+# ── IDE ───────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Project docs (local only, not needed to run) ─────────────────────
+docs/prd.md
+docs/evaluation.md
+docs/future_work_guidelines.md
+docs/Paper/
+docs/Report/
+issues.txt
+structure.txt
+tutor_implementation_plan.md
+scripts/tree.ps1
+server/test_llm.py

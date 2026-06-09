@@ -1,3 +1,0 @@
-the section selection works perfectly. but after selecting a section the mastery score came down from 100 to 86 while revising fractions. it also got updated in the dashboard to 86. things is mastery score should never decrease in restart mode. it should be locked once the chapter is done.
-
-once the chapter is done there is no need to show mastery progress bar in the chat session. it should be hidden.
